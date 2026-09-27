@@ -1,0 +1,14 @@
+{
+  "name": "aldex-sop-hub",
+  "version": "41.0.0",
+  "private": true,
+  "description": "Aldex SOP Hub — internal step-by-step SOP tool (single self-contained page).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "python3 build.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

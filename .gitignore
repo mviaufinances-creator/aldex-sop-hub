@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+*.zip
+# Finder duplicates and the claude.ai variant of the page
+Aldex_SOP_Hub [0-9]*.html
+Aldex_SOP_Hub_artifact.html
