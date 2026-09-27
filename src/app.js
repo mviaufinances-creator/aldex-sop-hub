@@ -166,6 +166,17 @@
     return '<span class="chip">' + esc(sop.steps.length === 1 ? u('oneStep') : u('steps', { n: sop.steps.length })) + '</span>';
   }
 
+  /* ───────── Analytics (Google Analytics 4, tag in app.html) ───────── */
+  function track(name, params) { try { if (typeof window.gtag === 'function') window.gtag('event', name, params || {}); } catch (e) {} }
+  let lastTrackedRoute = null;
+  function trackPageView() {
+    const route = location.hash.replace(/^#\/?/, '');
+    if (route === lastTrackedRoute) return; // re-renders (language switch, checkbox terms) are not new page views
+    lastTrackedRoute = route;
+    const path = '/' + route;
+    track('page_view', { page_title: document.title, page_location: location.origin + path, page_path: path, language: lang, role: currentRole || '(none)' });
+  }
+
   /* ───────── Routing ───────── */
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   function parseRoute() {
@@ -206,6 +217,7 @@
     main.innerHTML = view.html;
     document.title = (view.title ? view.title + ' — ' : '') + 'Aldex SOP Hub';
     renderChrome(r, view);
+    trackPageView();
     if (view.mount) view.mount(main);
     window.scrollTo(0, 0);
     main.focus({ preventScroll: true });
@@ -486,9 +498,11 @@
   /* ───────── SOP complete ───────── */
   function viewDone(sop) {
     const p = prog(sop.id), ro = roleById(sop.role);
+    const firstTime = !p.done;
     p.done = true; saveProgress();
     const missing = [];
     sop.steps.forEach((s, i) => { stepState(sop, i, p).items.forEach(it => { if (!p.checks[it.key]) missing.push({ step: i + 1, label: it.label }); }); });
+    if (firstTime) track('sop_complete', { sop_id: sop.id, sop_title: sop.num + ' · ' + sop.title.en, role: sop.role, items_unchecked: missing.length });
     const list = sopsFor(sop.role).filter(s => s.group !== 'start'), idx = list.indexOf(sop), nxt = list[idx + 1];
     const seq = !!(groupOf(sop) && groupOf(sop).seq);
     const mainEnd = seq && (!nxt || nxt.group !== sop.group);
@@ -719,6 +733,7 @@
         $('[data-save]', root).addEventListener('click', () => {
           const x = { rate: $('#tRate').value.trim().replace(/%$/, '') || DUTY_DEFAULT, hs: $('#tHs').value.trim() || '3914.00', source: $('#tSrc').value.trim(), verified: $('#tVer').value, note: $('#tNote').value.trim() };
           store.set(K_TARIFF, x);
+          track('china_duty_update', { rate: x.rate });
           reopen(JSON.stringify(tariffData()) === JSON.stringify(x) ? u('saved') : u('saveFail'));
         });
         $('[data-reset]', root).addEventListener('click', () => { store.del(K_TARIFF); reopen(u('resetDone')); });
@@ -742,6 +757,7 @@
   const SERVER_ROOTS = { 'Suivi des commandes': 'Z:\\- Suivis des Commandes', 'Price list': 'Z:\\', 'Shipping Weight Chart': 'Z:\\' };
   function openServerPath(workbook, sheet) {
     lastFocus = document.activeElement;
+    track('excel_path_open', { workbook: workbook, sheet: sheet });
     const root = SERVER_ROOTS[workbook] || 'Z:\\';
     const path = root + ' → ' + workbook + ' → ' + sheet;
     const tab = SHEET_TO_TAB[sheet.trim()];
@@ -808,6 +824,7 @@
   $('#roleSelect').addEventListener('change', (e) => go(e.target.value ? '#/role/' + e.target.value : '#/'));
   $('#langBtn').addEventListener('click', () => {
     lang = lang === 'en' ? 'fr' : 'en'; store.set(K_LANG, lang);
+    track('language_change', { language: lang });
     const y = window.scrollY; render(); window.scrollTo(0, y);
   });
   window.addEventListener('hashchange', render);
