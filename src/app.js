@@ -93,14 +93,14 @@
     whereFile: t('Where is this file?', 'Où est ce fichier?'),
     chinaDuty: t('China duty', 'Droit Chine'), dutyRate: t('China duty rate', 'Taux de droit Chine'),
     dutyWidgetNote: t('Manually maintained · tap to update', 'Maintenu manuellement · modifier'),
-    editDuty: t('Update China duty rate', 'Mettre à jour le taux de droit Chine'), resetDuty: t('Reset to 37.5%', 'Réinitialiser à 37,5 %'),
+    editDuty: t('Update China duty rate', 'Mettre à jour le taux de droit Chine'), resetDuty: t('Reset to 41.4%', 'Réinitialiser à 41,4 %'),
     lastUpdated: t('Last updated', 'Dernière mise à jour'), sourceNote: t('Source / note', 'Source / note'), sourcePh: t('Optional source or reference', 'Source ou référence facultative'),
     reference: t('Reference', 'Référence'), sourceDoc: t('Source document', 'Document source'), openSop: t('Open: {sop}', 'Ouvrir : {sop}'),
     sourceUrl: t('Source URL', 'URL de la source'), save: t('Save changes', 'Enregistrer'), reset: t('Reset', 'Réinitialiser'), close: t('Close', 'Fermer'),
     saved: t('Saved. This rate stays until you change or reset it.', 'Enregistré. Ce taux reste jusqu’à ce que vous le modifiiez ou le réinitialisiez.'),
     saveFail: t('Could not save in this browser.', 'Impossible d’enregistrer dans ce navigateur.'),
     urlRule: t('The source URL must begin with http:// or https://', 'L’URL de la source doit commencer par http:// ou https://'),
-    resetDone: t('Reset to the default rate (37.5%).', 'Réinitialisé au taux par défaut (37,5 %).'),
+    resetDone: t('Reset to the default rate (41.4%).', 'Réinitialisé au taux par défaut (41,4 %).'),
     tariffRule: t('The displayed China duty rate is manually maintained. Update it when the applicable rate changes; if you are not sure of the current rate, flag it and do not guess.', 'Le taux de droit Chine affiché est maintenu manuellement. Mettez-le à jour lorsque le taux applicable change; en cas de doute sur le taux actuel, signalez-le et ne devinez pas.'),
     excelSoonTitle: t('Excel connection coming soon', 'Connexion Excel à venir'),
     excelSoonBody: t('The direct link to the Aldex Excel source is not available yet. Open the workbook from the company drive, or view the embedded snapshot.', 'Le lien direct vers la source Excel Aldex n’est pas encore disponible. Ouvrez le classeur à partir du lecteur de l’entreprise ou consultez l’instantané intégré.'),
@@ -706,8 +706,13 @@
   }
 
   /* ───────── Tariff Watch — China duty rate (manually maintained, from hub V40) ───────── */
-  const DUTY_DEFAULT = '37.5';
-  const tariffData = () => store.get(K_TARIFF, {}) || {};
+  const DUTY_DEFAULT = '41.4';
+  const tariffData = () => {
+    const d = store.get(K_TARIFF, {}) || {};
+    // 37.5% was the previous default; a browser that saved it should now show the current rate.
+    if (String(d.rate || '').trim() === '37.5') delete d.rate;
+    return d;
+  };
   const dutyRate = () => { const r = String(tariffData().rate || DUTY_DEFAULT).trim(); return /^[\d.,]+$/.test(r) ? r + '%' : r; };
   function viewTariff() {
     const d = tariffData();
@@ -720,7 +725,7 @@
         ((d.verified || d.note || d.source) ? '<div class="callout note">' + [d.verified ? '<b>' + esc(u('lastUpdated')) + ':</b> ' + esc(d.verified) : '', d.source ? '<b>' + esc(u('sourceNote')) + ':</b> ' + esc(d.source) : '', d.note ? '<b>' + esc(u('notes')) + ':</b> ' + esc(d.note) : ''].filter(Boolean).join('<br>') + '</div>' : '') +
         '<div><button type="button" class="btn sm" data-edit>✎ ' + esc(u('editDuty')) + '</button></div>' +
         '<div data-editor hidden><div class="card pad" style="box-shadow:none;background:var(--surface-2)"><h3>' + esc(u('dutyRate')) + '</h3><p class="small" style="margin:4px 0 14px">' + esc(u('manualHelp')) + '</p>' +
-        '<div class="form-grid"><div><label for="tRate">' + esc(u('dutyRate')) + ' (%)</label><input class="input" id="tRate" inputmode="decimal" placeholder="37.5"></div><div><label for="tHs">' + esc(u('hts')) + '</label><input class="input" id="tHs"></div>' +
+        '<div class="form-grid"><div><label for="tRate">' + esc(u('dutyRate')) + ' (%)</label><input class="input" id="tRate" inputmode="decimal" placeholder="41.4"></div><div><label for="tHs">' + esc(u('hts')) + '</label><input class="input" id="tHs"></div>' +
         '<div><label for="tSrc">' + esc(u('sourceNote')) + '</label><input class="input" id="tSrc" placeholder="' + esc(u('sourcePh')) + '"></div><div><label for="tVer">' + esc(u('lastUpdated')) + '</label><input class="input" id="tVer" type="date"></div></div>' +
         '<div class="form-full" style="margin-top:12px"><label for="tNote">' + esc(u('notes')) + '</label><textarea class="input" id="tNote"></textarea></div>' +
         '<div class="tools"><button type="button" class="btn primary sm" data-save>' + esc(u('save')) + '</button><button type="button" class="btn sm" data-reset>↺ ' + esc(u('resetDuty')) + '</button></div><p class="small" data-save-status role="status" style="margin-top:8px"></p></div></div>' +
