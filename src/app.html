@@ -284,6 +284,21 @@ figcaption{font-size:13.5px;color:var(--muted);margin-top:8px}
 .path-steps li{margin:4px 0}
 .modal{width:min(560px,100%)}
 
+/* ── China duty verification & history ── */
+#dutyVerify{z-index:95}
+.verify-rate{margin:14px 0 12px;padding:14px 16px;border-radius:10px;background:var(--accent-soft);border:1px solid #cfdcfb}
+.verify-rate span{display:block;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--text-2)}
+.verify-rate b{display:block;font-size:32px;color:var(--accent);font-variant-numeric:tabular-nums;line-height:1.15}
+.verify-rate small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.duty-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hist-wrap{overflow-x:auto;border-top:1px solid var(--border)}
+.hist{min-width:560px}
+.hist th,.hist td{padding:10px 16px}
+.hist td:first-child{font-weight:500;width:auto;white-space:nowrap}
+.hist td{font-variant-numeric:tabular-nums}
+.hist .rate-old{color:var(--muted);text-decoration:line-through}
+.hist tr.base td{color:var(--muted);background:var(--surface-2)}
+
 /* ── Directory ── */
 .search{width:100%;max-width:420px;height:42px;border:1px solid var(--border-strong);border-radius:10px;padding:0 14px;background:#fff}
 .dir-role{margin-top:22px}
@@ -414,6 +429,9 @@ textarea.input{height:90px;padding:8px 10px;resize:vertical}
 
 <div class="overlay" id="excelModal" hidden role="dialog" aria-modal="true" aria-labelledby="excelModalTitle">
   <div class="card modal" id="excelModalBody"></div>
+</div>
+<div class="overlay" id="dutyVerify" hidden role="alertdialog" aria-modal="true" aria-labelledby="dutyVerifyTitle">
+  <div class="card modal" id="dutyVerifyBody"></div>
 </div>
 <div class="overlay lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Screenshot">
   <div class="frame"><img id="lightboxImg" alt=""></div>

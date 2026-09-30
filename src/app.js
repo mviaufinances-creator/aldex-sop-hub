@@ -8,7 +8,7 @@
     set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode / blocked */ } },
     del(key) { try { localStorage.removeItem(key); } catch (e) {} }
   };
-  const K_LANG = 'aldexSopHub.lang', K_PROGRESS = 'aldexSopHub.progress.v2', K_TARIFF = 'AldexChinaDutyManualV2';
+  const K_LANG = 'aldexSopHub.lang', K_PROGRESS = 'aldexSopHub.progress.v2', K_TARIFF = 'AldexChinaDutyManualV2', K_DUTY_HISTORY = 'AldexChinaDutyHistoryV1', K_DUTY_VERIFY = 'AldexChinaDutyVerifyV1';
 
   let lang = store.get(K_LANG, 'en') === 'fr' ? 'fr' : 'en';
   let progress = store.get(K_PROGRESS, {}) || {};
@@ -95,6 +95,15 @@
     dutyWidgetNote: t('Manually maintained · tap to update', 'Maintenu manuellement · modifier'),
     editDuty: t('Update China duty rate', 'Mettre à jour le taux de droit Chine'), resetDuty: t('Reset to 41.4%', 'Réinitialiser à 41,4 %'),
     lastUpdated: t('Last updated', 'Dernière mise à jour'), sourceNote: t('Source / note', 'Source / note'), sourcePh: t('Optional source or reference', 'Source ou référence facultative'),
+    verifyEyebrow: t('Every 5 days', 'Tous les 5 jours'), verifyTitle: t('Verify the China duty rate', 'Vérifier le taux de droit Chine'),
+    verifyBody: t('Confirm that this is still the applicable China duty rate before pricing, quoting or processing a shipment. If you are not sure, flag it and do not guess.', 'Confirmez qu’il s’agit toujours du taux de droit Chine applicable avant de fixer un prix, faire une soumission ou traiter une expédition. En cas de doute, signalez-le et ne devinez pas.'),
+    verifyHow: t('If the rate has changed, close this message and update it in Tariff Watch. This reminder comes back in 5 days.', 'Si le taux a changé, fermez ce message et mettez-le à jour dans Tariff Watch. Ce rappel reviendra dans 5 jours.'),
+    lastChangedOn: t('Last changed {date}: {from} → {to}', 'Dernière modification {date} : {from} → {to}'),
+    defaultSince: t('Site default {rate} since {date} · no manual change yet', 'Taux par défaut {rate} depuis le {date} · aucune modification manuelle'),
+    historyTitle: t('Rate change history', 'Historique des changements de taux'),
+    historySub: t('Every manual change to the China duty rate, newest first. Saved in this browser.', 'Chaque modification manuelle du taux de droit Chine, la plus récente en premier. Enregistré dans ce navigateur.'),
+    changedOn: t('Changed on', 'Modifié le'), rateChange: t('Rate', 'Taux'), effectiveDate: t('Rate date', 'Date du taux'),
+    siteDefault: t('Site default', 'Défaut du site'), siteDefaultNote: t('Default rate updated on the website', 'Taux par défaut mis à jour sur le site'), resetChip: t('Reset', 'Réinitialisé'),
     reference: t('Reference', 'Référence'), sourceDoc: t('Source document', 'Document source'), openSop: t('Open: {sop}', 'Ouvrir : {sop}'),
     sourceUrl: t('Source URL', 'URL de la source'), save: t('Save changes', 'Enregistrer'), reset: t('Reset', 'Réinitialiser'), close: t('Close', 'Fermer'),
     saved: t('Saved. This rate stays until you change or reset it.', 'Enregistré. Ce taux reste jusqu’à ce que vous le modifiiez ou le réinitialisiez.'),
@@ -713,7 +722,31 @@
     if (String(d.rate || '').trim() === '37.5') delete d.rate;
     return d;
   };
-  const dutyRate = () => { const r = String(tariffData().rate || DUTY_DEFAULT).trim(); return /^[\d.,]+$/.test(r) ? r + '%' : r; };
+  const pct = (r) => { r = String(r == null ? '' : r).trim(); return /^[\d.,]+$/.test(r) ? r + '%' : r; };
+  const dutyRate = () => pct(tariffData().rate || DUTY_DEFAULT);
+
+  // Archive of manual rate changes (newest first). The site-default row records when the
+  // built-in rate itself was changed in the code.
+  const DUTY_DEFAULT_SINCE = '2026-09-30', DUTY_PREVIOUS_DEFAULT = '37.5';
+  const dutyHistory = () => { const h = store.get(K_DUTY_HISTORY, []); return Array.isArray(h) ? h : []; };
+  function logDutyChange(from, to, extra) {
+    const h = dutyHistory();
+    h.unshift(Object.assign({ at: new Date().toISOString(), from: String(from), to: String(to) }, extra || {}));
+    store.set(K_DUTY_HISTORY, h.slice(0, 200));
+  }
+  const fmtDateTime = (iso) => { try { return new Date(iso).toLocaleString(lang === 'fr' ? 'fr-CA' : 'en-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } };
+  const fmtDate = (ymd) => { try { const [y, m, d] = ymd.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return ymd; } };
+  function lastChangeText() {
+    const h = dutyHistory()[0];
+    return h ? u('lastChangedOn', { date: fmtDateTime(h.at), from: pct(h.from), to: pct(h.to) })
+             : u('defaultSince', { rate: pct(DUTY_DEFAULT), date: fmtDate(DUTY_DEFAULT_SINCE) });
+  }
+  function historyTable() {
+    const rows = dutyHistory().map(h => '<tr><td>' + esc(fmtDateTime(h.at)) + '</td><td><span class="rate-old">' + esc(pct(h.from)) + '</span> → <b>' + esc(pct(h.to)) + '</b>' + (h.reset ? ' <span class="chip">' + esc(u('resetChip')) + '</span>' : '') + '</td><td>' + esc(h.effective ? fmtDate(h.effective) : '—') + '</td><td>' + esc([h.source, h.note].filter(Boolean).join(' · ') || '—') + '</td></tr>').join('');
+    const base = '<tr class="base"><td>' + esc(fmtDate(DUTY_DEFAULT_SINCE)) + '</td><td><span class="rate-old">' + esc(pct(DUTY_PREVIOUS_DEFAULT)) + '</span> → <b>' + esc(pct(DUTY_DEFAULT)) + '</b> <span class="chip">' + esc(u('siteDefault')) + '</span></td><td>' + esc(fmtDate(DUTY_DEFAULT_SINCE)) + '</td><td>' + esc(u('siteDefaultNote')) + '</td></tr>';
+    return '<section class="card"><div class="table-head" style="padding-bottom:10px"><div><h2 style="font-size:17px">' + esc(u('historyTitle')) + '</h2><p class="muted small" style="margin-top:2px">' + esc(u('historySub')) + '</p></div></div>' +
+      '<div class="hist-wrap"><table class="tbl hist"><thead><tr><th>' + esc(u('changedOn')) + '</th><th>' + esc(u('rateChange')) + '</th><th>' + esc(u('effectiveDate')) + '</th><th>' + esc(u('sourceNote')) + '</th></tr></thead><tbody>' + rows + base + '</tbody></table></div></section>';
+  }
   function viewTariff() {
     const d = tariffData();
     return {
@@ -723,27 +756,64 @@
         '<div class="field-grid"><div class="field"><span>' + esc(u('origin')) + '</span><strong>' + esc(u('china')) + '</strong></div><div class="field"><span>' + esc(u('destination')) + '</span><strong>' + esc(u('usa')) + '</strong></div>' +
         '<div class="field"><span>' + esc(u('hts')) + '</span><strong>' + esc(d.hs || '3914.00') + '</strong></div><div class="field duty"><span>' + esc(u('dutyRate')) + '</span><strong>' + esc(dutyRate()) + '</strong></div></div>' +
         ((d.verified || d.note || d.source) ? '<div class="callout note">' + [d.verified ? '<b>' + esc(u('lastUpdated')) + ':</b> ' + esc(d.verified) : '', d.source ? '<b>' + esc(u('sourceNote')) + ':</b> ' + esc(d.source) : '', d.note ? '<b>' + esc(u('notes')) + ':</b> ' + esc(d.note) : ''].filter(Boolean).join('<br>') + '</div>' : '') +
-        '<div><button type="button" class="btn sm" data-edit>✎ ' + esc(u('editDuty')) + '</button></div>' +
+        '<div class="duty-meta"><span class="muted small">' + esc(lastChangeText()) + '</span><button type="button" class="btn sm" data-edit>✎ ' + esc(u('editDuty')) + '</button></div>' +
         '<div data-editor hidden><div class="card pad" style="box-shadow:none;background:var(--surface-2)"><h3>' + esc(u('dutyRate')) + '</h3><p class="small" style="margin:4px 0 14px">' + esc(u('manualHelp')) + '</p>' +
         '<div class="form-grid"><div><label for="tRate">' + esc(u('dutyRate')) + ' (%)</label><input class="input" id="tRate" inputmode="decimal" placeholder="41.4"></div><div><label for="tHs">' + esc(u('hts')) + '</label><input class="input" id="tHs"></div>' +
         '<div><label for="tSrc">' + esc(u('sourceNote')) + '</label><input class="input" id="tSrc" placeholder="' + esc(u('sourcePh')) + '"></div><div><label for="tVer">' + esc(u('lastUpdated')) + '</label><input class="input" id="tVer" type="date"></div></div>' +
         '<div class="form-full" style="margin-top:12px"><label for="tNote">' + esc(u('notes')) + '</label><textarea class="input" id="tNote"></textarea></div>' +
         '<div class="tools"><button type="button" class="btn primary sm" data-save>' + esc(u('save')) + '</button><button type="button" class="btn sm" data-reset>↺ ' + esc(u('resetDuty')) + '</button></div><p class="small" data-save-status role="status" style="margin-top:8px"></p></div></div>' +
-        '<div class="callout flag"><strong>⚑ ' + esc(u('important')) + '</strong>' + esc(u('tariffRule')) + '</div></div>',
+        '<div class="callout flag"><strong>⚑ ' + esc(u('important')) + '</strong>' + esc(u('tariffRule')) + '</div></div>' +
+        '<div style="margin-top:18px">' + historyTable() + '</div>',
       mount(root) {
         const ed = $('[data-editor]', root);
-        const fill = () => { const x = tariffData(); $('#tRate').value = x.rate || DUTY_DEFAULT; $('#tHs').value = x.hs || '3914.00'; $('#tSrc').value = x.source || ''; $('#tVer').value = x.verified || ''; $('#tNote').value = x.note || ''; };
+        const fill = () => { const x = tariffData(); $('#tRate').value = x.rate || DUTY_DEFAULT; $('#tHs').value = x.hs || '3914.00'; $('#tSrc').value = x.source || ''; $('#tVer').value = x.verified || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10); $('#tNote').value = x.note || ''; };
         const reopen = (msg) => { render(); const e2 = $('[data-editor]'); e2.hidden = false; fill(); $('[data-save-status]').textContent = msg; };
         $('[data-edit]', root).addEventListener('click', () => { ed.hidden = !ed.hidden; if (!ed.hidden) { fill(); $('#tRate').focus(); $('#tRate').select(); } });
         $('[data-save]', root).addEventListener('click', () => {
           const x = { rate: $('#tRate').value.trim().replace(/%$/, '') || DUTY_DEFAULT, hs: $('#tHs').value.trim() || '3914.00', source: $('#tSrc').value.trim(), verified: $('#tVer').value, note: $('#tNote').value.trim() };
+          const before = String(tariffData().rate || DUTY_DEFAULT).trim();
           store.set(K_TARIFF, x);
-          track('china_duty_update', { rate: x.rate });
+          if (before !== x.rate) logDutyChange(before, x.rate, { effective: x.verified, source: x.source, note: x.note });
+          track('china_duty_update', { rate: x.rate, from: before });
           reopen(JSON.stringify(tariffData()) === JSON.stringify(x) ? u('saved') : u('saveFail'));
         });
-        $('[data-reset]', root).addEventListener('click', () => { store.del(K_TARIFF); reopen(u('resetDone')); });
+        $('[data-reset]', root).addEventListener('click', () => {
+          const before = String(tariffData().rate || DUTY_DEFAULT).trim();
+          store.del(K_TARIFF);
+          if (before !== DUTY_DEFAULT) logDutyChange(before, DUTY_DEFAULT, { reset: true });
+          reopen(u('resetDone'));
+        });
       }
     };
+  }
+
+  /* ───────── China duty verification pop-up (every 5 days; closes only with its Close button) ───────── */
+  const VERIFY_EVERY_MS = 5 * 24 * 60 * 60 * 1000;
+  let verifyShownThisLoad = false;
+  function verifyDue() {
+    const last = Number((store.get(K_DUTY_VERIFY, {}) || {}).lastClosed) || 0;
+    return Date.now() - last >= VERIFY_EVERY_MS;
+  }
+  function maybeShowVerify() {
+    if (!verifyDue() || !$('#dutyVerify').hidden) return;
+    // Without browser storage the close time can't be remembered; then show it once per visit only.
+    if (verifyShownThisLoad && (store.get(K_DUTY_VERIFY, null) == null)) return;
+    verifyShownThisLoad = true;
+    const d = tariffData(), box = $('#dutyVerifyBody');
+    box.innerHTML = '<div class="eyebrow">⚑ ' + esc(u('verifyEyebrow')) + '</div><h2 id="dutyVerifyTitle" style="margin-top:4px">' + esc(u('verifyTitle')) + '</h2>' +
+      '<div class="verify-rate"><span>' + esc(u('dutyRate')) + ' · HTS ' + esc(d.hs || '3914.00') + '</span><b>' + esc(dutyRate()) + '</b><small>' + esc(lastChangeText()) + '</small></div>' +
+      '<p>' + esc(u('verifyBody')) + '</p><p class="muted small" style="margin-top:8px">' + esc(u('verifyHow')) + '</p>' +
+      '<div class="row"><button type="button" class="btn primary" data-verify-close>' + esc(u('close')) + '</button></div>';
+    const m = $('#dutyVerify');
+    lastFocus = document.activeElement;
+    m.hidden = false;
+    $('[data-verify-close]', m).addEventListener('click', () => {
+      store.set(K_DUTY_VERIFY, { lastClosed: Date.now(), rate: dutyRate() });
+      m.hidden = true;
+      track('duty_verify_closed', { rate: dutyRate() });
+      if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+    });
+    $('[data-verify-close]', m).focus();
   }
 
   /* ───────── Modal & lightbox ───────── */
@@ -821,6 +891,11 @@
   $('#lightboxClose').addEventListener('click', closeLightbox);
   $('#lightboxFull').addEventListener('click', () => { const lb = $('#lightbox'); lb.classList.toggle('full'); $('#lightboxFull').textContent = lb.classList.contains('full') ? u('fitSize') : u('fullSize'); });
   document.addEventListener('keydown', (e) => {
+    if (!$('#dutyVerify').hidden) {
+      if (e.key === 'Tab') { e.preventDefault(); $('[data-verify-close]').focus(); }
+      if (e.key === 'Escape') e.preventDefault();
+      return;
+    }
     if (e.key !== 'Escape') return;
     if (!$('#lightbox').hidden) closeLightbox();
     else if (!$('#excelModal').hidden) closeModal();
@@ -836,4 +911,8 @@
 
   render();
   loadSavedHandles();
+  maybeShowVerify();
+  // Also catch the 5-day mark when the hub stays open (checked hourly and when the tab comes back).
+  setInterval(maybeShowVerify, 60 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeShowVerify(); });
 })();
